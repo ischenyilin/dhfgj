@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>组内&组间离差平方和 全自动计算器</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:"微软雅黑",sans-serif;max-width:900px;margin:30px auto;padding:0 20px;background:#f7f9fc;}
+        h1{color:#2c3e50;text-align:center;margin-bottom:10px;font-size:22px;}
+        .tip{color:#666;text-align:center;margin-bottom:20px;font-size:14px;}
+        .group-card{background:#fff;padding:15px;border-radius:8px;margin:12px 0;box-shadow:0 2px 6px #00000015;}
+        .group-card label{font-weight:bold;margin-right:10px;}
+        .group-card input{width:calc(100% - 120px);padding:8px 10px;border:1px solid #ddd;border-radius:4px;font-size:15px;}
+        .btn-group{text-align:center;margin:20px 0;gap:10px;display:flex;justify-content:center;flex-wrap:wrap;}
+        button{padding:10px 20px;border:none;border-radius:6px;font-size:15px;cursor:pointer;color:white;}
+        .btn-add{background:#3498db;}
+        .btn-calc{background:#27ae60;}
+        .btn-clear{background:#e74c3c;}
+        .result-box{background:#fff;padding:20px;border-radius:8px;margin-top:20px;box-shadow:0 2px 8px #00000015;}
+        .result-title{font-size:18px;font-weight:bold;margin-bottom:15px;color:#2c3e50;}
+        .row{padding:6px 0;border-bottom:1px dashed #eee;}
+        .total-line{font-weight:bold;font-size:16px;color:#c0392b;padding-top:10px;margin-top:10px;border-top:2px solid #ddd;}
+        .note{margin-top:15px;font-size:13px;color:#888;}
+    </style>
+</head>
+<body>
+<h1>📊 离差平方和全自动计算器</h1>
+<p class="tip">每组数据请用英文逗号分隔，例如：10,12,11,9</p >
+
+<div id="groupContainer">
+    <div class="group-card">
+        <label>第1组数据：</label>
+        <input type="text" class="dataInput" placeholder="输入本组全部数字">
+    </div>
+</div>
+
+<div class="btn-group">
+    <button class="btn-add" onclick="addGroup()">➕ 添加新分组</button>
+    <button class="btn-calc" onclick="calculate()">✅ 一键全部计算</button>
+    <button class="btn-clear" onclick="clearAll()">🗑️ 清空重置</button>
+</div>
+
+<div class="result-box" id="resultArea"></div>
+
+<script>
+    // 添加新分组
+    let groupCount = 1;
+    function addGroup(){
+        groupCount++;
+        const container = document.getElementById('groupContainer');
+        const div = document.createElement('div');
+        div.className = 'group-card';
+        div.innerHTML = `
+            <label>第${groupCount}组数据：</label>
+            <input type="text" class="dataInput" placeholder="输入本组全部数字">
+        `;
+        container.appendChild(div);
+    }
+
+    // 清空全部
+    function clearAll(){
+        document.querySelectorAll('.dataInput').forEach(i=>i.value='');
+        document.getElementById('resultArea').innerHTML = '';
+    }
+
+    // 核心计算函数
+    function calculate(){
+        const inputs = document.querySelectorAll('.dataInput');
+        const groups = [];
+        let allData = [];
+        let html = `<div class="result-title">📈 详细计算结果</div>`;
+
+        // 1. 解析每组数据
+        for(let i=0;i<inputs.length;i++){
+            const val = inputs[i].value.trim();
+            if(!val) continue;
+            const strList = val.split(',');
+            const numList = [];
+            let error = false;
+            for(let s of strList){
+                const n = parseFloat(s.trim());
+                if(isNaN(n)){
+                    error = true;
+                    break;
+                }
+                numList.push(n);
+            }
+            if(error){
+                html += `<p style="color:red">第${i+1}组：数据格式有误，请只用英文逗号分隔数字！</p >`;
+                continue;
+            }
+            if(numList.length===0) continue;
+
+            // 本组基础统计
+            const n = numList.length;
+            const mean = numList.reduce((a,b)=>a+b,0)/n;
+            // 本组组内离差平方和
+            const sse_i = numList.reduce((sum,x)=>sum + Math.pow(x-mean,2),0);
+
+            groups.push({n, mean, sse_i});
+            allData = allData.concat(numList);
+
+            // 单组结果展示
+            html += `<div class="row">
+                <strong>第${i+1}组</strong>：样本数=${n}，本组平均数 = ${mean.toFixed(4)}，
+                本组组内离差平方和 = ${sse_i.toFixed(4)}
+            </div>`;
+        }
+
+        if(groups.length===0){
+            document.getElementById('resultArea').innerHTML = `<p>请先输入至少一组有效数据</p >`;
+            return;
+        }
+
+        // 2. 总组内离差平方和 SSE
+        const totalSSE = groups.reduce((sum,g)=>sum + g.sse_i, 0);
+
+        // 3. 全部总体均值
+        const totalN = allData.length;
+        const grandMean = allData.reduce((a,b)=>a+b,0)/totalN;
+
+        // 4. 组间离差平方和 SSA
+        let totalSSA = 0;
+        for(let g of groups){
+            totalSSA += g.n * Math.pow(g.mean - grandMean, 2);
+        }
+
+        // 5. 总平方和 SST
+        const totalSST = allData.reduce((sum,x)=>sum + Math.pow(x-grandMean,2),0);
+
+        // 汇总结果
+        html += `<hr style="margin:15px 0;border-color:#eee;">`;
+        html += `<div class="total-line">
+            🌟 总体汇总结果：<br>
+            总组内离差平方和 SSE = ${totalSSE.toFixed(4)}<br>
+            组间离差平方和 SSA = ${totalSSA.toFixed(4)}<br>
+            全部总平方和 SST = ${totalSST.toFixed(4)}<br>
+            校验：SSE+SSA = ${(totalSSE+totalSSA).toFixed(4)} = SST ✅
+        </div>`;
+
+        html += `<div class="note">
+        💡 公式校验：总平方和(SST) = 组间平方和(SSA) + 组内平方和(SSE)
+        </div>`;
+
+        document.getElementById('resultArea').innerHTML = html;
+    }
+</script>
+</body>
+</html>
